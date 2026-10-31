@@ -104,6 +104,7 @@ impl Session {
     pub fn invalidate_saved(&mut self, id: DocId) -> Result<(), EditError> {
         let doc = self.doc_mut(id)?;
         if doc.path.is_none() {
+            doc.generation = doc.generation.wrapping_add(1);
             doc.dirty = true;
             if let Some(editor) = doc.editor.as_mut() {
                 editor.unsaved_file = true;

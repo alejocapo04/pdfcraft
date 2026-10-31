@@ -771,10 +771,17 @@ impl PdfCraftApp {
 
     /// Whether tab `index` has work that isn't saved: edits, or form typing not committed yet.
     pub(crate) fn has_unsaved_work(&self, index: usize) -> bool {
+        let Some(view) = self.views.get(index) else { return false };
+        self.session.get(view.id).is_some_and(|doc| doc.dirty)
+            || self.file_provider.as_ref().is_some_and(|bridge| bridge.host.pending_for(view.id.0))
+            || self.has_uncommitted_work(index)
+    }
+
+    /// UI drafts have not reached the PDF graph or its generation counter yet.
+    pub(crate) fn has_uncommitted_work(&self, index: usize) -> bool {
         let Some(v) = self.views.get(index) else { return false };
         let Some(doc) = self.session.get(v.id) else { return false };
-        doc.dirty
-            || v.pending_edit.is_some()
+        v.pending_edit.is_some()
             || v.content.blocked().is_some()
             || v.forms.focus.as_ref().is_some_and(|f| crate::forms_ui::draft_edit(f, &doc.form).is_some())
             || v.fill_text.as_ref().is_some_and(|t| !t.text.trim().is_empty())

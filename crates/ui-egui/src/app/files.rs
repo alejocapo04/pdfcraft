@@ -238,6 +238,7 @@ impl PdfCraftApp {
         activate: bool,
     ) -> Result<(), String> {
         use pdfcraft_render::OpenError;
+        self.provider_supersede_password(&bytes);
         let prepared = match self.session.prepare_open(name, path.clone(), bytes.clone(), password) {
             Ok(prepared) => prepared,
             Err(e @ (OpenError::NeedsPassword | OpenError::WrongPassword)) => {
@@ -446,7 +447,7 @@ impl PdfCraftApp {
             return;
         };
         #[cfg(not(target_arch = "wasm32"))]
-        if self.ctx.is_some() && !self.run_inline {
+        if self.ctx.is_some() && !self.run_inline && !self.is_provider_open_buffer(&p.bytes) {
             let result = self.schedule_open(OpenRequest {
                 name: p.name.clone(),
                 path: p.path.clone(),
@@ -756,6 +757,10 @@ impl PdfCraftApp {
     }
 
     pub fn close_tab(&mut self, index: usize) {
+        if self.views.get(index).is_some_and(|view| self.file_provider.as_ref().is_some_and(|bridge| bridge.host.pending_for(view.id.0))) {
+            self.notify_tr("Finish or cancel the pending provider save before closing this tab");
+            return;
+        }
         if index >= self.views.len() {
             return;
         }
