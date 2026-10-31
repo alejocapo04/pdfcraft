@@ -161,6 +161,8 @@ impl PdfCraftApp {
             unsaved_flag: Default::default(),
             os_events: None,
             host_save: None,
+            file_provider: None,
+            file_provider_publish: None,
             host_dirty: None,
             close_request: None,
             save_prompt_button: Default::default(),
@@ -391,6 +393,7 @@ impl eframe::App for PdfCraftApp {
     /// the quit guard, shortcuts, and the background jobs' results.
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.ctx = Some(ctx.clone());
+        self.file_provider_tick();
         #[cfg(not(target_arch = "wasm32"))]
         self.window_state.repair(ctx);
         self.dialog_epoch();

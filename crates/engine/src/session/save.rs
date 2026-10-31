@@ -91,6 +91,27 @@ impl Session {
         Self::refresh(doc).inspect_err(|_| Self::show_released(doc))
     }
 
+    /// Rebase an acknowledged external snapshot without inventing a filesystem path.
+    pub fn mark_saved_external(&mut self, id: DocId, bytes: Arc<Vec<u8>>, name: String) -> Result<(), EditError> {
+        self.mark_saved(id, bytes, None)?;
+        let doc = self.doc_mut(id)?;
+        doc.path = None;
+        doc.name = name;
+        Ok(())
+    }
+
+    /// An external overwrite invalidated a pathless document's last save checkpoint.
+    pub fn invalidate_saved(&mut self, id: DocId) -> Result<(), EditError> {
+        let doc = self.doc_mut(id)?;
+        if doc.path.is_none() {
+            doc.dirty = true;
+            if let Some(editor) = doc.editor.as_mut() {
+                editor.unsaved_file = true;
+            }
+        }
+        Ok(())
+    }
+
     /// Enter the permissions (owner) password of a document opened with its user password,
     /// lifting its restrictions for this session (Acrobat asks for it before changing security).
     /// Not an edit: nothing is marked unsaved and there is no undo step. Undo and redo states

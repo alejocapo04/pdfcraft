@@ -139,6 +139,9 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
             }
 
             ui.add_space(26.0);
+            if let Some(bridge) = &app.file_provider {
+                bridge.host.recent_ui(ui);
+            }
             let mut clear = false;
             ui.horizontal(|ui| {
                 ui.label(egui::RichText::new(tl!("Recent")).font(theme::semibold(17.0)));

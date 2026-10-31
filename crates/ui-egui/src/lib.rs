@@ -53,8 +53,10 @@ mod bidi;
 mod dialogs;
 pub use edit_text_ui::CropMode;
 mod editing;
+pub mod file_providers;
 mod home;
 mod panels;
+pub mod provider;
 pub use print_ui::{Handling as PrintHandling, OptionsSource, PrintDraft, PrinterSource, Which as PrintWhich, system_printers};
 pub use redact_ui::{HiddenDraft, PagesDraft as RedactPagesDraft, RedactPrefs, SearchDraft as RedactSearchDraft, SearchMode as RedactSearchMode};
 pub mod i18n;
@@ -421,6 +423,9 @@ pub struct PdfCraftApp {
     pub os_events: Option<OsEventsFn>,
     /// Save delivers to the embedding page instead of downloading (web, see [`HostSaveFn`]).
     pub host_save: Option<HostSaveFn>,
+    /// Optional same-origin web file integration. Absent in desktop and CLI hosts.
+    pub file_provider: Option<provider::Bridge>,
+    pub file_provider_publish: Option<fn(&file_providers::Host)>,
     /// Reports unsaved work to the embedding page (web, see [`HostDirtyFn`]).
     pub host_dirty: Option<HostDirtyFn>,
     /// A pending "save changes?" question (closing a dirty tab or quitting).

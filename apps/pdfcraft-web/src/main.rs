@@ -4,6 +4,9 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 #[cfg(target_arch = "wasm32")]
+mod file_providers;
+
+#[cfg(target_arch = "wasm32")]
 fn main() {
     use eframe::wasm_bindgen::JsCast;
     use pdfcraft_ui_egui::PdfCraftApp;
@@ -23,6 +26,13 @@ fn main() {
                 options,
                 Box::new(|cc| {
                     let mut app = PdfCraftApp::new();
+                    let provider = pdfcraft_ui_egui::file_providers::Host::default();
+                    if let Err(error) = file_providers::install(provider.clone(), cc.egui_ctx.clone()) {
+                        eframe::web_sys::console::error_1(&error);
+                    } else {
+                        app.file_provider = Some(pdfcraft_ui_egui::provider::Bridge::new(provider));
+                        app.file_provider_publish = Some(file_providers::publish);
+                    }
                     // "printcraft": settings saved under the app's former name, PrintCraft.
                     if let Some(json) = cc.storage.and_then(|s| s.get_string("pdfcraft").or_else(|| s.get_string("printcraft"))) {
                         app.restore(&json);

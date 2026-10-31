@@ -70,6 +70,14 @@ impl PdfCraftApp {
         }
     }
 
+    pub(crate) fn open_provider_pdf(&mut self, name: &str, bytes: std::sync::Arc<Vec<u8>>) {
+        self.startup_superseded = true;
+        if let Err(error) = self.try_open(name, None, bytes.clone(), None, true) {
+            self.provider_opened_pdf(&bytes, Err(error.clone()));
+            self.notify_fmt("Couldn't open: {e}", &[("e", &error)]);
+        }
+    }
+
     /// Open a document and make it the active tab. Encrypted files raise the password prompt.
     pub fn open_bytes(&mut self, name: &str, path: Option<String>, bytes: Vec<u8>) -> Result<(), String> {
         self.startup_superseded = true;
@@ -252,9 +260,15 @@ impl PdfCraftApp {
                 });
                 return Ok(());
             }
-            Err(e) => return Err(e.to_string()),
+            Err(e) => {
+                let error = e.to_string();
+                self.provider_opened_pdf(&bytes, Err(error.clone()));
+                return Err(error);
+            }
         };
-        self.finish_open(name, path, bytes.len(), prepared, activate).map(|_| ())
+        let result = self.finish_open(name, path, bytes.len(), prepared, activate);
+        self.provider_opened_pdf(&bytes, result.clone());
+        result.map(|_| ())
     }
 
     fn finish_open(
@@ -421,6 +435,7 @@ impl PdfCraftApp {
     pub fn submit_password(&mut self, password: Option<String>) {
         let Some(p) = self.password_prompt.take() else { return };
         let Some(pw) = password else {
+            self.provider_opened_pdf(&p.bytes, Err("Password entry was cancelled".into()));
             // A cancelled recovery goes back on offer; its snapshot stays in the store and must
             // not attach itself to whatever document is unlocked next (#813).
             if let Some(meta) = p.recovered {

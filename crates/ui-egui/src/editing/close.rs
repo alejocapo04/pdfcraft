@@ -154,7 +154,8 @@ impl PdfCraftApp {
 
     /// Publish whether any document has unsaved work, for the browser's reload warning (#812).
     pub(crate) fn sync_unsaved_flag(&self) {
-        self.unsaved_flag.store(self.first_dirty().is_some(), std::sync::atomic::Ordering::Relaxed);
+        self.unsaved_flag
+            .store(self.first_dirty().is_some() || self.file_provider.as_ref().is_some_and(|b| b.host.busy()), std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Intercept window close while documents have unsaved changes.

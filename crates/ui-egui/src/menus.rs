@@ -416,6 +416,23 @@ impl PdfCraftApp {
             items.push(Node::Separator);
             items.push(self.menu_item("file.clear_recent", Some(tl!("Clear Recent Files"))));
         }
+        if let Some(bridge) = self.file_provider.as_ref().filter(|b| b.host.enabled()) {
+            let snapshot = bridge.host.snapshot();
+            let label = snapshot["label"].as_str().unwrap_or("Provider");
+            let external = snapshot["resources"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|resource| {
+                    let id = resource["id"].as_str()?;
+                    let name = resource["name"].as_str()?;
+                    Some(Item::new(CommandRef::with_params("file.provider_recent", serde_json::json!({"resourceId":id})), name).into())
+                })
+                .collect::<Vec<Node>>();
+            let mut groups = vec![Node::submenu(format!("Recent — {label}"), external)];
+            groups.push(Node::submenu("Recent on this device", items));
+            items = groups;
+        }
         let label = commands::command("file.open_recent").map_or("Open Recent", |c| c.label);
         Node::submenu(crate::i18n::menu_label("file.open_recent", label), items)
     }
@@ -474,6 +491,7 @@ impl PdfCraftApp {
         let text = ctx.text_edit_focused() && matches!(command.id.as_str(), "edit.undo" | "edit.redo" | "edit.copy" | CUT | PASTE | SELECT_ALL);
         let enabled = text
             || match command.id.as_str() {
+                "file.provider_recent" => self.file_provider.as_ref().is_some_and(|b| b.host.enabled()),
                 NO_RECENT => false,
                 "file.open_recent" => index.is_none_or(|i| i < self.recent.len()),
                 "file.clear_recent" => !self.recent.is_empty(),
@@ -528,6 +546,16 @@ impl PdfCraftApp {
             [true, false].map(|pressed| egui::Event::Key { key, physical_key: None, pressed, repeat: false, modifiers })
         };
         match command.id.as_str() {
+            "file.provider_recent" => {
+                if let Some(id) = command.params.get("resourceId").and_then(serde_json::Value::as_str)
+                    && let Some(bridge) = &self.file_provider
+                {
+                    if let Err(error) = bridge.host.request_open(id) {
+                        self.notify_fmt("Couldn't open: {e}", &[("e", &error)]);
+                    }
+                    ctx.request_repaint();
+                }
+            }
             "file.open_recent" if index.is_some() => {
                 if let Some(path) = index.and_then(|i| self.recent.get(i)).map(|r| r.path.clone()) {
                     self.open_recent(&path);
