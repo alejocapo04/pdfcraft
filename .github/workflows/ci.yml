@@ -14,16 +14,6 @@ jobs:
       CARGO_INCREMENTAL: "0"
       CARGO_PROFILE_DEV_DEBUG: "0"
       RUST_TEST_THREADS: "1"
-      CARGO_TARGET_DIR: ${{ runner.temp }}/provider-native-target
-      CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
-      CRAFT_FONTS_REQUIRED: "1"
-      TMPDIR: /tmp/acp-qa
-      XDG_RUNTIME_DIR: ${{ runner.temp }}/provider-runtime
-      XDG_CONFIG_HOME: ${{ runner.temp }}/provider-config
-      XDG_DATA_HOME: ${{ runner.temp }}/provider-data
-      XDG_CACHE_HOME: ${{ runner.temp }}/provider-cache
-      EVIDENCE_DIR: ${{ runner.temp }}/provider-evidence
-      CRAFT_PROVIDER_UI_FIXTURES: ${{ runner.temp }}/provider-evidence
       WGPU_BACKEND: vulkan
       EXPECTED_SOURCE_SHA: "2d64695120687f1472fdaa4fe16f27fbb34939a2"
       CARGO_CACHE_AUTO_CLEAN_FREQUENCY: "never"
@@ -35,6 +25,28 @@ jobs:
         with:
           ref: "2d64695120687f1472fdaa4fe16f27fbb34939a2"
           persist-credentials: false
+      - name: Prepare runtime environment before tool setup
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d -m 700 /tmp/acp-qa "$RUNNER_TEMP/provider-runtime" "$RUNNER_TEMP/provider-config" "$RUNNER_TEMP/provider-data" "$RUNNER_TEMP/provider-cache" "$RUNNER_TEMP/provider-evidence" "$RUNNER_TEMP/provider-native-target"
+          {
+            echo "TMPDIR=/tmp/acp-qa"
+            echo "CARGO_TARGET_DIR=$RUNNER_TEMP/provider-native-target"
+            echo "XDG_RUNTIME_DIR=$RUNNER_TEMP/provider-runtime"
+            echo "XDG_CONFIG_HOME=$RUNNER_TEMP/provider-config"
+            echo "XDG_DATA_HOME=$RUNNER_TEMP/provider-data"
+            echo "XDG_CACHE_HOME=$RUNNER_TEMP/provider-cache"
+            echo "EVIDENCE_DIR=$RUNNER_TEMP/provider-evidence"
+            echo "CRAFT_PROVIDER_UI_FIXTURES=$RUNNER_TEMP/provider-evidence"
+            echo "CRAFT_FONTS_DIR=$GITHUB_WORKSPACE/craft-fonts"
+            echo "CRAFT_FONTS_REQUIRED=1"
+          } >> "$GITHUB_ENV"
+      - name: Free unused SDK space on disposable hosted runner
+        shell: bash
+        run: |
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: storytold/craft-fonts
