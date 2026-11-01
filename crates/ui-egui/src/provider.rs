@@ -477,7 +477,7 @@ mod tests {
         let ctx = egui::Context::default();
         app.ctx = Some(ctx.clone());
         host.result(request, "saved".into(), "file-1".into()).unwrap();
-        let _ = ctx.run(egui::RawInput { events: vec![egui::Event::Text("Input after capture".into())], ..Default::default() }, |_| {
+        let _ = ctx.run_ui(egui::RawInput { events: vec![egui::Event::Text("Input after capture".into())], ..Default::default() }, |_| {
             app.file_provider_tick()
         });
         assert!(!called.load(Ordering::SeqCst));
