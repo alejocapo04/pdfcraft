@@ -126,9 +126,20 @@ fn provider_open_is_correlated_and_committed_after_decode() {
     assert!(!host.bound(1));
     assert!(host.disconnect().is_err());
     let commands = host.take_commands();
-    assert!(matches!(&commands[0], Command::Open { request, resource, bytes, .. } if request == &read && resource == "one" && bytes == &[7]));
+    assert!(matches!(&commands[0], Command::Open { request, bytes, .. } if request == &read && bytes == &[7]));
     host.opened(&read, Some(capture(1, 1)), "");
     assert!(host.bound(1));
+    {
+        let state = host.state();
+        let binding = state.bindings.get(&1).unwrap();
+        assert_eq!(binding.resource, "one");
+        assert_eq!(binding.name, "Example.docx");
+    }
+    let events = host.take_events();
+    let opened = events.iter().find(|event| event.metadata["type"] == "opened").unwrap();
+    assert_eq!(opened.metadata["requestId"], read);
+    assert_eq!(opened.metadata["resourceId"], "one");
+    assert_eq!(opened.metadata["documentId"], "1");
     assert!(host.open(read, "Example.docx".into(), vec![]).is_err());
 }
 
