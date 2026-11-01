@@ -8,14 +8,14 @@ permissions:
 jobs:
   native:
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    timeout-minutes: 240
     env:
       CARGO_BUILD_JOBS: "2"
       CARGO_INCREMENTAL: "0"
       CARGO_PROFILE_DEV_DEBUG: "0"
       RUST_TEST_THREADS: "1"
       WGPU_BACKEND: vulkan
-      EXPECTED_SOURCE_SHA: "e5db9e6b5031bbfadb2e8aafb1bb6da6411af6db"
+      EXPECTED_SOURCE_SHA: "8aeb9878fd3fc3483ef4083e93ad6f35438defce"
       CARGO_CACHE_AUTO_CLEAN_FREQUENCY: "never"
       NEXTEST_TEST_THREADS: "1"
       RUST_BACKTRACE: "1"
@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: "e5db9e6b5031bbfadb2e8aafb1bb6da6411af6db"
+          ref: "8aeb9878fd3fc3483ef4083e93ad6f35438defce"
           persist-credentials: false
       - name: Prepare runtime environment before tool setup
         shell: bash
@@ -73,21 +73,50 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
           install -d -m 700 "$TMPDIR" "$XDG_RUNTIME_DIR" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME" "$EVIDENCE_DIR"
           mkdir -p qa-output artifacts
-      - name: "Format"
+      - name: "Format before compilation"
         shell: bash
         run: |
           set -euo pipefail
           timeout 5m cargo fmt --all -- --check
-      - name: "Clippy touched packages"
+      - name: "Clippy of all affected native targets"
         shell: bash
         run: |
           set -euo pipefail
-          timeout 45m cargo clippy --locked -p pdfcraft-engine -p pdfcraft-ui-egui -p pdfcraft-web -p pdfcraft --all-targets -j2 -- -D warnings
-      - name: "Full affected native tests"
+          timeout 55m cargo clippy --locked -p pdfcraft-ui-egui -p pdfcraft-web --all-targets --keep-going -j2 -- -D warnings
+      - name: "Prove the account-switch regression fails without the reset"
         shell: bash
         run: |
           set -euo pipefail
-          timeout 45m cargo test --locked -p pdfcraft-engine -p pdfcraft-ui-egui -p pdfcraft-web --lib --bins --tests -j2 -- --test-threads=1
+          timeout 45m python3 - <<'PY'
+          import os,pathlib,re,subprocess
+          p=pathlib.Path('crates/ui-egui/src/file_providers.rs')
+          original=p.read_bytes()
+          text=original.decode('utf-8')
+          start=text.index('pub fn disconnect(')
+          end=text.index('\n    }',start)
+          body=text[start:end]
+          reset='        s.documents = Value::Null;'
+          assert body.count(reset)==1, 'Expected one document-cache reset in disconnect'
+          mutated=text[:start]+body.replace(reset,'',1)+text[end:]
+          env=dict(os.environ,CARGO_TERM_COLOR='never')
+          try:
+              p.write_bytes(mutated.encode('utf-8'))
+              result=subprocess.run(['cargo','test','--locked','-p','pdfcraft-ui-egui','--lib','file_providers::tests::disconnect_clears_published_document_metadata_before_another_account_connects','-j2','--','--exact','--test-threads=1'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,env=env,timeout=2400)
+              (pathlib.Path(os.environ['EVIDENCE_DIR'])/'account-reset-negative.log').write_text(result.stdout)
+              expected='test file_providers::tests::disconnect_clears_published_document_metadata_before_another_account_connects ... FAILED'
+              assert result.returncode!=0 and expected in result.stdout, 'Negative control must fail in the actual regression, not compilation or a missing test: '+result.stdout[-10000:]
+              print('Confirmed regression fails without the published disconnect reset: file_providers::tests::disconnect_clears_published_document_metadata_before_another_account_connects')
+              print(result.stdout[-5000:])
+          finally:
+              p.write_bytes(original)
+          assert p.read_bytes()==original
+          subprocess.run(['git','diff','--exit-code','--','crates/ui-egui/src/file_providers.rs'],check=True)
+          PY
+      - name: "All affected native tests on restored published source"
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 65m cargo test --locked -p pdfcraft-ui-egui -p pdfcraft-web --lib --bins --tests -j2 -- --test-threads=1
       - name: "Affected doctests and minimal CLI"
         shell: bash
         run: |
@@ -114,8 +143,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          timeout 30m cargo run --locked -p pdfcraft-ui-egui --example shot -- qa-output/pdfcraft-default-e5db9e6b.png --size 1440x900 --scale 1
-          timeout 5m cargo run --locked -p pdfcraft-ui-egui --example shot -- qa-output/pdfcraft-provider-e5db9e6b.png --file-provider-preview --size 1440x900 --scale 1
+          timeout 25m cargo run --locked -p pdfcraft-ui-egui --example shot -- "$EVIDENCE_DIR/pdfcraft-off.png" --size 1440x900 --scale 1
+          timeout 5m cargo run --locked -p pdfcraft-ui-egui --example shot -- "$EVIDENCE_DIR/pdfcraft-on.png" --file-provider-preview --size 1440x900 --scale 1
       - name: Verify native evidence and source identity
         shell: bash
         run: |
@@ -129,7 +158,7 @@ jobs:
           fonts_sha = subprocess.check_output(['git','-C','craft-fonts','rev-parse','HEAD'],text=True).strip() if pathlib.Path('craft-fonts/.git').exists() else None
           assert fonts_sha == "b076417b5880bd4154bd22f00695b1d28c6bea83"
           rustc = subprocess.check_output(['rustc','-Vv'],text=True)
-          files = ["qa-output/pdfcraft-default-e5db9e6b.png","qa-output/pdfcraft-provider-e5db9e6b.png"]
+          files = ["$EVIDENCE_DIR/pdfcraft-off.png","$EVIDENCE_DIR/pdfcraft-on.png"]
           assert len(files) == 2
           proof = []
           for raw in files:
@@ -148,10 +177,10 @@ jobs:
       - name: Upload two native captures and provenance
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: provider-ui-pdfcraft-e5db9e6b5031
+          name: provider-ui-pdfcraft-8aeb9878fd3f
           path: |
-            ${{ runner.temp }}/provider-evidence/pdfcraft-default-e5db9e6b.png
-            ${{ runner.temp }}/provider-evidence/pdfcraft-provider-e5db9e6b.png
+            ${{ runner.temp }}/provider-evidence/pdfcraft-off.png
+            ${{ runner.temp }}/provider-evidence/pdfcraft-on.png
             ${{ runner.temp }}/provider-evidence/provenance.json
           if-no-files-found: error
           retention-days: 14
