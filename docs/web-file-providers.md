@@ -25,3 +25,14 @@ A browser download is not evidence that a file reached durable storage. The adap
 ## Validation
 
 Regression fixtures cover opt-in defaults, account/request isolation, bounded metadata, exact-generation acknowledgement, native PDF serialization/reopen, separate resource identities and delayed acknowledgements after newer edits. They are source fixtures until executed; publication precedes validation for this contribution.
+
+## Native UI preview
+
+The existing offscreen shot example can install synthetic external Recents:
+
+```sh
+cargo run -p pdfcraft-ui-egui --example shot -- provider.png --file-provider-preview --size 1440x900 --scale 1
+```
+
+Omit --file-provider-preview for the unchanged default-off Home view. This flag only injects
+public Host and Bridge state into the example; it adds no backend, credentials or storage.
