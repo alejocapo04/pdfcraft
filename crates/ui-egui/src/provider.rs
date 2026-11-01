@@ -312,6 +312,49 @@ mod tests {
         assert_eq!(doc.name, "external.pdf");
     }
 
+    #[test]
+    fn paused_bound_and_pending_saves_do_not_run_a_local_save_or_close_callback() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+        for bound in [false, true] {
+            let (mut app, host) = setup();
+            let id = app.views[0].id;
+            assert!(app.apply_edit(Edit::SetFieldValue { name: "name".into(), value: FieldValue::Text("Captured".into()) }));
+            let (request, _) = capture(&mut app, &host);
+            if bound {
+                host.result(request.clone(), "saved".into(), "file-1".into()).unwrap();
+                app.file_provider_tick();
+                assert!(app.apply_edit(Edit::SetFieldValue { name: "name".into(), value: FieldValue::Text("Later edit".into()) }));
+            }
+            host.take_events();
+            host.set_enabled(false).unwrap();
+            let called = Arc::new(AtomicBool::new(false));
+            for target in [SaveTarget::InPlace, SaveTarget::As] {
+                let after = called.clone();
+                assert!(!app.save_then(0, target, move |_| {
+                    after.store(true, Ordering::SeqCst);
+                }));
+            }
+            assert!(!called.load(Ordering::SeqCst));
+            #[cfg(not(target_arch = "wasm32"))]
+            assert!(!app.pickers.pending());
+            assert!(host.take_events().is_empty());
+            assert!(app.session.get(id).unwrap().dirty);
+            assert_eq!(host.bound(id.0), bound);
+            if !bound {
+                host.result(request, "failed".into(), String::new()).unwrap();
+                app.file_provider_tick();
+                assert!(app.session.get(id).unwrap().dirty);
+                assert!(!host.pending_for(id.0));
+            }
+            host.set_enabled(true).unwrap();
+            assert_eq!(host.bound(id.0), bound);
+            assert!(app.session.get(id).unwrap().dirty);
+        }
+    }
+
     fn capture_after(app: &mut PdfCraftApp, host: &Host, after: impl FnOnce(&mut PdfCraftApp) + Send + 'static) -> String {
         let index = app.active.unwrap();
         assert!(!app.save_then(index, SaveTarget::InPlace, after));
