@@ -214,7 +214,7 @@ pub fn publish(host: &Host) {
         }
         for event in events {
             if let Err(error) = dispatch(&event.metadata, event.bytes) {
-                log::error!("file-provider event delivery failed: {error:?}");
+                eframe::web_sys::console::error_1(&format!("file-provider event delivery failed: {error:?}").into());
             }
         }
     }
