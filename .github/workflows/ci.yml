@@ -15,7 +15,7 @@ jobs:
       CARGO_PROFILE_DEV_DEBUG: "0"
       RUST_TEST_THREADS: "1"
       WGPU_BACKEND: vulkan
-      EXPECTED_SOURCE_SHA: "2d64695120687f1472fdaa4fe16f27fbb34939a2"
+      EXPECTED_SOURCE_SHA: "4fceaccbdad2b6c38d87ad66e5c279b92b5eb128"
       CARGO_CACHE_AUTO_CLEAN_FREQUENCY: "never"
       NEXTEST_TEST_THREADS: "1"
       RUST_BACKTRACE: "1"
@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: "2d64695120687f1472fdaa4fe16f27fbb34939a2"
+          ref: "4fceaccbdad2b6c38d87ad66e5c279b92b5eb128"
           persist-credentials: false
       - name: Prepare runtime environment before tool setup
         shell: bash
@@ -113,8 +113,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          timeout 30m cargo run --locked -p pdfcraft-ui-egui --example shot -- qa-output/pdfcraft-default-2d646951.png --size 1440x900 --scale 1
-          timeout 5m cargo run --locked -p pdfcraft-ui-egui --example shot -- qa-output/pdfcraft-provider-2d646951.png --file-provider-preview --size 1440x900 --scale 1
+          timeout 30m cargo run --locked -p pdfcraft-ui-egui --example shot -- qa-output/pdfcraft-default-4fceaccb.png --size 1440x900 --scale 1
+          timeout 5m cargo run --locked -p pdfcraft-ui-egui --example shot -- qa-output/pdfcraft-provider-4fceaccb.png --file-provider-preview --size 1440x900 --scale 1
       - name: Verify native evidence and source identity
         shell: bash
         run: |
@@ -128,7 +128,7 @@ jobs:
           fonts_sha = subprocess.check_output(['git','-C','craft-fonts','rev-parse','HEAD'],text=True).strip() if pathlib.Path('craft-fonts/.git').exists() else None
           assert fonts_sha == "b076417b5880bd4154bd22f00695b1d28c6bea83"
           rustc = subprocess.check_output(['rustc','-Vv'],text=True)
-          files = ["qa-output/pdfcraft-default-2d646951.png","qa-output/pdfcraft-provider-2d646951.png"]
+          files = ["qa-output/pdfcraft-default-4fceaccb.png","qa-output/pdfcraft-provider-4fceaccb.png"]
           assert len(files) == 2
           proof = []
           for raw in files:
@@ -147,10 +147,10 @@ jobs:
       - name: Upload two native captures and provenance
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: provider-ui-pdfcraft-2d6469512068
+          name: provider-ui-pdfcraft-4fceaccbdad2
           path: |
-            ${{ runner.temp }}/provider-evidence/pdfcraft-default-2d646951.png
-            ${{ runner.temp }}/provider-evidence/pdfcraft-provider-2d646951.png
+            ${{ runner.temp }}/provider-evidence/pdfcraft-default-4fceaccb.png
+            ${{ runner.temp }}/provider-evidence/pdfcraft-provider-4fceaccb.png
             ${{ runner.temp }}/provider-evidence/provenance.json
           if-no-files-found: error
           retention-days: 14
