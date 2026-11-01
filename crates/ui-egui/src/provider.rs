@@ -477,9 +477,10 @@ mod tests {
         let ctx = egui::Context::default();
         app.ctx = Some(ctx.clone());
         host.result(request, "saved".into(), "file-1".into()).unwrap();
-        let _ = ctx.run_ui(egui::RawInput { events: vec![egui::Event::Text("Input after capture".into())], ..Default::default() }, |_| {
+        let mut output = ctx.run_ui(egui::RawInput { events: vec![egui::Event::Text("Input after capture".into())], ..Default::default() }, |_| {
             app.file_provider_tick()
         });
+        output.textures_delta.clear();
         assert!(!called.load(Ordering::SeqCst));
         assert_eq!(app.views.len(), 1);
     }
